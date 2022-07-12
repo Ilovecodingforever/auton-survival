@@ -104,7 +104,7 @@ def train_dcph(model, train_data, val_data, epochs=50,
   for epoch in tqdm(range(epochs)):
 
     # train_step_start = time.time()
-    _ = train_step(model, xt, tt, et, optimizer, bs, seed=epoch)
+    _ = train_step(model, xt, tt_, et_, optimizer, bs, seed=epoch)
     # print(f'Duration of train-step: {time.time() - train_step_start}')
     # test_step_start = time.time()
     valcn = test_step(model, xv, tv_, ev_)

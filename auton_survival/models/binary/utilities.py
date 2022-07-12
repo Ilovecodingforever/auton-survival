@@ -82,8 +82,9 @@ def fit_km_estimators(model, out, t, e,):
   # out = model(x)
   t = np.reshape(t, (-1, 1))
   e = np.reshape(e, (-1, 1))
+  out = out.detach().cpu().numpy()
   quantiles = [(1. / model.n_bins) * i for i in range(model.n_bins + 1)]
-  outbins = np.quantile(out.detach().cpu().numpy(), quantiles)  
+  outbins = np.quantile(out, quantiles)  
   
   score_conditional_km_estimators = {}
 

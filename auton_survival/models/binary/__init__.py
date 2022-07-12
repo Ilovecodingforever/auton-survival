@@ -70,16 +70,19 @@ class BinarySurvivalClassifier:
 
     return (x_train, t_train, e_train, x_val, t_val, e_val)
 
-  def _gen_torch_model(self, inputdim, optimizer):
+  def _gen_torch_model(self, inputdim, optimizer, n_bins, survival_estimator):
     """Helper function to return a torch model."""
     # Add random seed to get the same results like in dcm __init__.py
     np.random.seed(self.random_seed)
     torch.manual_seed(self.random_seed)
     
     return BinarySurvivalClassifierTorch(inputdim, layers=self.layers,
-                                         optimizer=optimizer)
+                                         optimizer=optimizer,
+                                         n_bins=n_bins, 
+                                         survival_estimator=survival_estimator)
 
-  def fit(self, x, t, e, vsize=0.15, val_data=None,
+  def fit(self, x, t, e, n_bins=20, survival_estimator='km', 
+          vsize=0.15, val_data=None,
           iters=1, learning_rate=1e-3, batch_size=100,
           optimizer="Adam"):
 
@@ -93,7 +96,7 @@ class BinarySurvivalClassifier:
 
     inputdim = x_train.shape[-1]
 
-    model = self._gen_torch_model(inputdim, optimizer)
+    model = self._gen_torch_model(inputdim, optimizer, n_bins, survival_estimator)
 
     model, _ = train_binary_survival(model,
                                     (x_train, t_train, e_train),

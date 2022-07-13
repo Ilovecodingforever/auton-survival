@@ -30,9 +30,16 @@ def bce_loss(model, x, t, e, time):
   logits = model.forward(x)
 
   # bce loss
+  # criterion = nn.BCEWithLogitsLoss(reduction='none')
+  # loss = criterion(logits, y)
+  # loss = torch.sum(loss)
+
   criterion = nn.BCEWithLogitsLoss(reduction='none')
-  loss = criterion(logits, y)
-  loss = torch.sum(loss)
+  mask = ~torch.isnan(y)
+
+  loss = torch.zeros_like(y)
+  loss[mask] = criterion(logits[mask], y[mask])
+  loss = torch.nansum(loss)
 
   return loss
 

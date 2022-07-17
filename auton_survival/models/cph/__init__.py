@@ -27,11 +27,12 @@ import torch
 import numpy as np
 
 from .dcph_torch import DeepCoxPHTorch, DeepRecurrentCoxPHTorch
-from .dcph_utilities import train_dcph, predict_survival
+from .dcph_utilities import train_dcph, predict_survival, partial_ll_loss
 
 from auton_survival.utils import _dataframe_to_array
 from auton_survival.models.dsm.utilities import _get_padded_features
 from auton_survival.models.dsm.utilities import _get_padded_targets
+from auton_survival.models.dsm.utilities import _reshape_tensor_with_nans
 
 
 class DeepCoxPH:
@@ -232,6 +233,36 @@ class DeepCoxPH:
 
     scores = predict_survival(self.torch_model, x, t)
     return scores
+
+  def compute_nll(self, x, t, e):
+    r"""This function computes the negative log likelihood of the given data.
+    In case of competing risks, the negative log likelihoods are summed over
+    the different events' type.
+    Parameters
+    ----------
+    x: np.ndarray
+        A numpy array of the input features, \( x \).
+    t: np.ndarray
+        A numpy array of the event/censoring times, \( t \).
+    e: np.ndarray
+        A numpy array of the event/censoring indicators, \( \delta \).
+        \( \delta = r \) means the event r took place.
+    Returns:
+      float: Negative log likelihood.
+    """
+    if not self.fitted:
+      raise Exception("The model has not been fitted yet. Please fit the " +
+                      "model using the `fit` method on some training data " +
+                      "before calling `_eval_nll`.")
+    processed_data = self._preprocess_training_data(x, t, e, 0, None, 0)
+    _, _, _, x_val, t_val, e_val = processed_data
+    x_val, t_val, e_val = x_val,\
+        _reshape_tensor_with_nans(t_val),\
+        _reshape_tensor_with_nans(e_val)
+
+    loss = float(partial_ll_loss(self.torch_model(x_val), t_val, e_val).detach().numpy())
+
+    return loss
 
 
 class DeepRecurrentCoxPH(DeepCoxPH):

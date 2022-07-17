@@ -3,11 +3,12 @@ import torch
 import numpy as np
 
 from .binary_torch import BinarySurvivalClassifierTorch
-from .utilities import train_binary_survival, predict_survival
+from .utilities import train_binary_survival, predict_survival, bce_loss
 
 from auton_survival.utils import _dataframe_to_array
 from auton_survival.models.dsm.utilities import _get_padded_features
 from auton_survival.models.dsm.utilities import _get_padded_targets
+from auton_survival.models.dsm.utilities import _reshape_tensor_with_nans
 
 
 class BinarySurvivalClassifier:
@@ -75,14 +76,14 @@ class BinarySurvivalClassifier:
     # Add random seed to get the same results like in dcm __init__.py
     np.random.seed(self.random_seed)
     torch.manual_seed(self.random_seed)
-    
+
     return BinarySurvivalClassifierTorch(inputdim, layers=self.layers,
                                          optimizer=optimizer,
-                                         n_bins=n_bins, 
+                                         n_bins=n_bins,
                                          survival_estimator=survival_estimator)
 
-  def fit(self, x, t, e, n_bins=20, survival_estimator='km', 
-          vsize=0.15, val_data=None,
+  def fit(self, x, t, e, n_bins=20, survival_estimator='km',
+          vsize=0.15, val_data=None, event_horizon_time=10*365.25,
           iters=1, learning_rate=1e-3, batch_size=100,
           optimizer="Adam"):
 
@@ -105,10 +106,12 @@ class BinarySurvivalClassifier:
                                     lr=learning_rate,
                                     bs=batch_size,
                                     return_losses=True,
+                                    event_horizon_time=event_horizon_time,
                                     random_seed=self.random_seed)
 
     self.torch_model = (model[0].eval(), model[1])
     self.fitted = True
+    self.event_horizon_time = event_horizon_time
 
     return self
 
@@ -150,3 +153,33 @@ class BinarySurvivalClassifier:
     scores = predict_survival(self.torch_model, x, t)
     return scores
 
+  def compute_nll(self, x, t, e):
+    r"""This function computes the negative log likelihood of the given data.
+    In case of competing risks, the negative log likelihoods are summed over
+    the different events' type.
+    Parameters
+    ----------
+    x: np.ndarray
+        A numpy array of the input features, \( x \).
+    t: np.ndarray
+        A numpy array of the event/censoring times, \( t \).
+    e: np.ndarray
+        A numpy array of the event/censoring indicators, \( \delta \).
+        \( \delta = r \) means the event r took place.
+    Returns:
+      float: Negative log likelihood.
+    """
+    if not self.fitted:
+      raise Exception("The model has not been fitted yet. Please fit the " +
+                      "model using the `fit` method on some training data " +
+                      "before calling `_eval_nll`.")
+    processed_data = self._preprocess_training_data(x, t, e, 0, None, 0)
+    _, _, _, x_val, t_val, e_val = processed_data
+    x_val, t_val, e_val = x_val,\
+        _reshape_tensor_with_nans(t_val),\
+        _reshape_tensor_with_nans(e_val)
+
+    loss = float(bce_loss(self.torch_model, x_val, t_val, e_val,
+                          self.event_horizon_time).detach().numpy())
+
+    return loss

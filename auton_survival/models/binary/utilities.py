@@ -91,8 +91,8 @@ def fit_km_estimators(model, out, t, e,):
   e = np.reshape(e, (-1, 1))
   out = out.detach().cpu().numpy()
   quantiles = [(1. / model.n_bins) * i for i in range(model.n_bins + 1)]
-  outbins = np.quantile(out, quantiles)  
-  
+  outbins = np.quantile(out, quantiles)
+
   score_conditional_km_estimators = {}
 
   for n_bin in range(model.n_bins):
@@ -106,7 +106,7 @@ def fit_km_estimators(model, out, t, e,):
       binmin = -np.inf
     if n_bin == model.n_bins-1:
       binmax = np.inf
-    score_conditional_km_estimators[(binmin, binmax)] = lifelines.KaplanMeierFitter().fit(t[scorebin], 
+    score_conditional_km_estimators[(binmin, binmax)] = lifelines.KaplanMeierFitter().fit(t[scorebin],
                                                                                           e[scorebin])
 
   return score_conditional_km_estimators
@@ -160,10 +160,10 @@ def train_binary_survival(model, train_data, val_data,
 
     if patience_ == patience:
       if model.survival_estimator == 'km':
-        model = (model, 
+        model = (model,
                 fit_km_estimators(model,
                                   model(xt),
-                                  tt_.detach().cpu().numpy(), 
+                                  tt_.detach().cpu().numpy(),
                                   et_.detach().cpu().numpy())
                 )
       else:
@@ -177,10 +177,10 @@ def train_binary_survival(model, train_data, val_data,
     valc = valcn
 
   if model.survival_estimator == 'km':
-    model = (model, 
+    model = (model,
             fit_km_estimators(model,
                               model(xt),
-                              tt_.detach().cpu().numpy(), 
+                              tt_.detach().cpu().numpy(),
                               et_.detach().cpu().numpy())
             )
   else:
@@ -194,7 +194,7 @@ def train_binary_survival(model, train_data, val_data,
 
 def predict_survival(model, x, t_horizons):
   model, score_conditional_km_estimators = model
-  
+
   if isinstance(t_horizons, (int, float)): t_horizons = [t_horizons]
 
   out = model(x).detach().cpu().numpy().ravel()
@@ -203,7 +203,7 @@ def predict_survival(model, x, t_horizons):
   if model.survival_estimator == 'km':
     for (binmin, binmax) in score_conditional_km_estimators:
       mask = (out >= binmin) & (out <= binmax)
-      output[mask, :] = score_conditional_km_estimators[(binmin, 
+      output[mask, :] = score_conditional_km_estimators[(binmin,
                                                          binmax)].predict(t_horizons).T.values
   else:
     raise NotImplementedError('No estimator named', model.survival_estimator)
